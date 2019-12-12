@@ -1,4 +1,5 @@
 import { Application, Context } from "probot"; // eslint-disable-line no-unused-vars
+import titleize from 'titleize';
 
 const PROJECT_COLUMN_TODO = "To do";
 const PROJECT_COLUMN_IN_PROGRESS = "In progress";
@@ -222,7 +223,7 @@ function parseIssueBody(body: string): IssueMeta {
     let sub_items = item.trim().split(" ");
     switch (sub_items[0].toLowerCase()) {
       case "/kind":
-        meta.kind = sub_items[1];
+        meta.kind = titleize(sub_items[1]);
         break;
       case "/point":
         meta.point = Number.parseInt(sub_items[1]);
