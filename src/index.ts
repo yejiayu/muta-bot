@@ -45,9 +45,9 @@ export = (app: Application) => {
     }
 
     const params = context.issue({
-      title: context.payload.issue.title.startsWith(`[${issueMeta.kind}]`)
-        ? context.payload.issue.title
-        : `[${issueMeta.kind}]` + context.payload.issue.title,
+      title: context.payload.issue.title.toLowerCase().startsWith(`[${issueMeta.kind.toLowerCase()}]`)
+        ? titleize(context.payload.issue.title)
+        : `[${titleize(issueMeta.kind)}]` + context.payload.issue.title,
       assignees: issueMeta.assignees.concat(issueMeta.reviewers),
       labels: [
         "k:" + issueMeta.kind,
@@ -223,7 +223,7 @@ function parseIssueBody(body: string): IssueMeta {
     let sub_items = item.trim().split(" ");
     switch (sub_items[0].toLowerCase()) {
       case "/kind":
-        meta.kind = titleize(sub_items[1]);
+        meta.kind = sub_items[1];
         break;
       case "/point":
         meta.point = Number.parseInt(sub_items[1]);
