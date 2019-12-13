@@ -2,6 +2,7 @@ import { Application, Context } from "probot"; // eslint-disable-line no-unused-
 import titleize from "titleize";
 
 import FileDB from "./db";
+import weekly from "./weekly";
 
 const PROJECT_COLUMN_TODO = "To do";
 const PROJECT_COLUMN_IN_PROGRESS = "In progress";
@@ -24,6 +25,8 @@ interface IssueMeta {
 }
 
 export = (app: Application) => {
+  // weekly(app);
+
   app.on("issues.opened", async context => {
     const body = context.payload.issue.body;
     if (!isTaskIssue(body)) {
@@ -203,11 +206,13 @@ export = (app: Application) => {
       const issueMeta = fileDB.getIssuesMeta(context.payload.issue.id);
       const liveReviewers = approve(context);
 
-      const reviewers = issueMeta.reviewers.map(s => {
-        const reviewer = `- @${s}`;
-        const flag = liveReviewers.indexOf(s) === -1 ? " √" : "";
-        return reviewer + flag;
-      });
+      const reviewers = issueMeta.reviewers
+        .map(s => {
+          const reviewer = `- @${s}`;
+          const flag = liveReviewers.indexOf(s) === -1 ? " √" : "";
+          return reviewer + flag;
+        })
+        .join("\r\n");
       await context.github.issues.createComment(
         context.issue({
           body: `@${context.payload.sender.login} approved \r\n\r\n **Reviewers**:\r\n${reviewers}`
