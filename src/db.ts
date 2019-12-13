@@ -1,9 +1,9 @@
 import low from "lowdb";
 import FileSync from "lowdb/adapters/FileSync";
 
-import { IssueMeta, IssueWithProject } from "./types";
+import { IssueMeta, IssueWithProject, LatestWeekly } from "./types";
 
-export default class FileDB {
+class FileDB {
   private db: low.LowdbSync<any>;
 
   constructor(file: string) {
@@ -13,10 +13,24 @@ export default class FileDB {
     db.defaults({
       issue_meta: {},
       issue_with_project: {},
-      issue_reviewers: {}
+      issue_reviewers: {},
+      issue_start_at: {},
+      latest_weekly_issue: {
+        number: 0,
+        id: 0,
+        node_id: ""
+      }
     }).write();
 
     this.db = db;
+  }
+
+  public saveIssueStartAt(id: number, start_at: number) {
+    this.db.set(`issue_start_at.${id}`, start_at).write();
+  }
+
+  public getIssueStartAt(id: number): number {
+    return this.db.get(`issue_start_at.${id}`).value();
   }
 
   public saveIssuesMeta(id: number, meta: IssueMeta) {
@@ -42,4 +56,21 @@ export default class FileDB {
   public getIssueReviewers(id: number): string[] {
     return this.db.get(`issue_reviewers.${id}`).value();
   }
+
+  public saveLatestWeeklyIssue(id: number, number: number, node_id: string) {
+    this.db
+      .set("latest_weekly_issue", {
+        id,
+        number,
+        node_id
+      })
+      .write();
+  }
+
+  public getLatestWeeklyIssue(): LatestWeekly {
+    return this.db.get("latest_weekly_issue").value();
+  }
 }
+
+const fileDB = new FileDB("db.json");
+export default fileDB;

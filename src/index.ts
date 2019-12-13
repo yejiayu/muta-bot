@@ -1,7 +1,7 @@
 import { Application, Context } from "probot"; // eslint-disable-line no-unused-vars
 import titleize from "titleize";
 
-import FileDB from "./db";
+import fileDB from "./db";
 import weekly from "./weekly";
 
 const PROJECT_COLUMN_TODO = "To do";
@@ -14,8 +14,6 @@ const LABEL_IN_PROGRESS = "bot:in-progress";
 const LABEL_IN_REVIEW = "bot:in-review";
 const LABEL_DONE = "bot:done";
 
-const fileDB = new FileDB("db.json");
-
 interface IssueMeta {
   kind: string;
   point: number;
@@ -25,7 +23,7 @@ interface IssueMeta {
 }
 
 export = (app: Application) => {
-  // weekly(app);
+  weekly(app);
 
   app.on("issues.opened", async context => {
     const body = context.payload.issue.body;
@@ -164,6 +162,8 @@ export = (app: Application) => {
               "Nice Boat! When you start a task, please comment /PATL call reviewers."
           })
         );
+
+        fileDB.saveIssueStartAt(context.payload.issue.id, Date.now());
       }
     } else if (comment.startsWith("/ptal")) {
       if (!isOwnerMessage(context)) {
@@ -252,7 +252,7 @@ export = (app: Application) => {
           });
         }
       }
-    } else if (comment.startsWith("/abort")) {
+    } else if (comment.startsWith("/baba")) {
       if (!isOwnerMessage(context)) {
         return;
       }

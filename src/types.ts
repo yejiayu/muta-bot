@@ -11,3 +11,9 @@ export interface IssueWithProject {
   cardID: number;
   column: number;
 }
+
+export interface LatestWeekly {
+  number: number;
+  id: number;
+  node_id: string;
+}

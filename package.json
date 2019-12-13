@@ -24,6 +24,7 @@
   "dependencies": {
     "@types/lowdb": "^1.0.9",
     "lowdb": "^1.0.0",
+    "moment": "^2.24.0",
     "probot": "^9.5.3",
     "probot-scheduler": "^2.0.0-beta.1",
     "titleize": "^2.1.0"
