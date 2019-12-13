@@ -1,5 +1,7 @@
 import { Application, Context } from "probot"; // eslint-disable-line no-unused-vars
-import titleize from 'titleize';
+import titleize from "titleize";
+
+import FileDB from "./db";
 
 const PROJECT_COLUMN_TODO = "To do";
 const PROJECT_COLUMN_IN_PROGRESS = "In progress";
@@ -10,6 +12,8 @@ const LABEL_TODO = "bot:todo";
 const LABEL_IN_PROGRESS = "bot:in-progress";
 const LABEL_IN_REVIEW = "bot:in-review";
 const LABEL_DONE = "bot:done";
+
+const fileDB = new FileDB("db.json");
 
 interface IssueMeta {
   kind: string;
@@ -26,6 +30,8 @@ export = (app: Application) => {
       return;
     }
     const issueMeta = parseIssueBody(body);
+    fileDB.saveIssuesMeta(context.payload.issue.id, issueMeta);
+    fileDB.saveIssueReviewers(context.payload.issue.id, issueMeta.reviewers);
 
     const {
       data: listMilestone
@@ -45,7 +51,9 @@ export = (app: Application) => {
     }
 
     const params = context.issue({
-      title: context.payload.issue.title.toLowerCase().startsWith(`[${issueMeta.kind.toLowerCase()}]`)
+      title: context.payload.issue.title
+        .toLowerCase()
+        .startsWith(`[${issueMeta.kind.toLowerCase()}]`)
         ? titleize(context.payload.issue.title)
         : `[${titleize(issueMeta.kind)}]` + context.payload.issue.title,
       assignees: issueMeta.assignees.concat(issueMeta.reviewers),
@@ -69,6 +77,49 @@ export = (app: Application) => {
       );
     }
   });
+
+  // app.on("issues.edited", async context => {
+  //   const body = context.payload.issue.body;
+  //   if (!isTaskIssue(body)) {
+  //     return;
+  //   }
+  //   const issueMeta = parseIssueBody(body);
+  //
+  //   const {
+  //     data: listMilestone
+  //   } = await context.github.issues.listMilestonesForRepo(context.issue());
+  //
+  //   const milestone =
+  //     issueMeta.milestone.toLowerCase() === "latest"
+  //       ? listMilestone[listMilestone.length - 1]
+  //       : listMilestone.find(m => m.title === issueMeta.milestone);
+  //   if (!milestone) {
+  //     await context.github.issues.createComment(
+  //       context.issue({
+  //         body: `Not found milestone ${issueMeta.milestone}`
+  //       })
+  //     );
+  //     return;
+  //   }
+  //
+  //   const params = context.issue({
+  //     title: context.payload.issue.title
+  //       .toLowerCase()
+  //       .startsWith(`[${issueMeta.kind.toLowerCase()}]`)
+  //       ? titleize(context.payload.issue.title)
+  //       : `[${titleize(issueMeta.kind)}]` + context.payload.issue.title,
+  //     assignees: issueMeta.assignees.concat(issueMeta.reviewers),
+  //     labels: [
+  //       "k:" + issueMeta.kind,
+  //       "p" + issueMeta.point,
+  //       "bot:task",
+  //       "bot:todo"
+  //     ],
+  //     milestone: milestone.number
+  //   });
+  //
+  //   await context.github.issues.update(params);
+  // });
 
   app.on("issue_comment", async context => {
     const body = context.payload.issue.body;
@@ -149,12 +200,21 @@ export = (app: Application) => {
         return;
       }
 
-      await context.github.issues.removeAssignees(
-        context.issue({ assignees: [context.payload.sender.login] })
+      const issueMeta = fileDB.getIssuesMeta(context.payload.issue.id);
+      const liveReviewers = approve(context);
+
+      const reviewers = issueMeta.reviewers.map(s => {
+        const reviewer = `- @${s}`;
+        const flag = liveReviewers.indexOf(s) === -1 ? " √" : "";
+        return reviewer + flag;
+      });
+      await context.github.issues.createComment(
+        context.issue({
+          body: `@${context.payload.sender.login} approved \r\n\r\n **Reviewers**:\r\n${reviewers}`
+        })
       );
 
-      const { data: issue } = await context.github.issues.get(context.issue());
-      if (issue.assignees.length === 0) {
+      if (liveReviewers.length === 0) {
         const labels = context.payload.issue.labels.map(l => l.name);
         if (
           isLabelByName(labels, [LABEL_TODO, LABEL_IN_PROGRESS, LABEL_DONE])
@@ -176,6 +236,11 @@ export = (app: Application) => {
             issue_number: context.payload.issue.number,
             labels: labels.filter(s => s !== LABEL_IN_REVIEW)
           };
+          await context.github.issues.createComment(
+            context.issue({
+              body: `All reviewers have approved, task completed.`
+            })
+          );
           await context.github.issues.update({
             ...params,
             state: "closed"
@@ -186,11 +251,25 @@ export = (app: Application) => {
       if (!isOwnerMessage(context)) {
         return;
       }
+
       const params = {
         owner: context.payload.repository.owner.login,
         repo: context.payload.repository.name,
         issue_number: context.payload.issue.number
       };
+
+      await context.github.issues.removeLabels(context.issue());
+      await context.github.issues.deleteMilestone(
+        context.issue({
+          milestone_number: context.payload.issue.milestone.number
+        })
+      );
+      await context.github.issues.removeAssignees(
+        context.issue({
+          assignees: context.payload.issue.assignees.map(a => a.login)
+        })
+      );
+
       await context.github.issues.update({
         ...params,
         state: "closed"
@@ -237,12 +316,26 @@ function parseIssueBody(body: string): IssueMeta {
       case "/milestone":
         meta.milestone = sub_items[1];
         break;
-      default:
-        console.log("not match", sub_items[0]);
     }
   });
 
   return meta;
+}
+
+function approve(context: Context): string[] {
+  const sender = context.payload.sender.login;
+  const reviewers = fileDB.getIssueReviewers(context.payload.issue.id);
+  const newReviewers = reviewers.filter(s => s !== sender);
+
+  fileDB.saveIssueReviewers(context.payload.issue.id, newReviewers);
+
+  return newReviewers;
+}
+
+async function removeCard(context: Context) {
+  const projectInfo = fileDB.getIssueWithProject(context.payload.issue.id);
+
+  context.github.projects.deleteCard({ card_id: projectInfo.cardID });
 }
 
 async function issueMoveColumn(
@@ -250,65 +343,59 @@ async function issueMoveColumn(
   projectName: string,
   columnName: string
 ): Promise<boolean> {
-  const { data: projects } = await context.github.projects.listForRepo(
-    context.issue()
-  );
-
-  const project = projects.find(p => p.name === projectName);
-  if (!project) {
-    await context.github.issues.createComment(
-      context.issue({
-        body: `Not found project ${projectName}`
-      })
-    );
-    return false;
-  }
-
-  const { data: listColumn } = await context.github.projects.listColumns({
-    project_id: project.id
-  });
-
-  const columnID = findColumnID(listColumn, columnName);
   if (columnName === PROJECT_COLUMN_TODO) {
-    await context.github.projects.createCard({
+    const { data: projects } = await context.github.projects.listForRepo(
+      context.issue()
+    );
+
+    const project = projects.find(p => p.name === projectName);
+    if (!project) {
+      await context.github.issues.createComment(
+        context.issue({
+          body: `Not found project ${projectName}`
+        })
+      );
+      return false;
+    }
+
+    const { data: listColumn } = await context.github.projects.listColumns({
+      project_id: project.id
+    });
+
+    const columnID = findColumnID(listColumn, columnName);
+    const { data: card } = await context.github.projects.createCard({
       column_id: columnID,
       content_id: context.payload.issue.id,
       content_type: "Issue"
     });
 
+    fileDB.saveIssueWithProject(context.payload.issue.id, {
+      projectID: project.id,
+      cardID: card.id,
+      column: columnID
+    });
     return true;
   }
 
-  let lastColumn = 0;
-  if (columnName === PROJECT_COLUMN_IN_PROGRESS) {
-    lastColumn = findColumnID(listColumn, PROJECT_COLUMN_TODO);
-  } else if (columnName === PROJECT_COLUMN_IN_REVIEW) {
-    lastColumn = findColumnID(listColumn, PROJECT_COLUMN_IN_PROGRESS);
-  } else if (columnName === PROJECT_COLUMN_DONW) {
-    lastColumn = findColumnID(listColumn, PROJECT_COLUMN_IN_REVIEW);
-  }
-  const { data: listCards } = await context.github.projects.listCards({
-    column_id: lastColumn
+  const issueProject = fileDB.getIssueWithProject(context.payload.issue.id);
+  const { data: listColumn } = await context.github.projects.listColumns({
+    project_id: issueProject.projectID
   });
 
-  const card = listCards.find(c => c.content_url === context.payload.issue.url);
-  if (card) {
-    await context.github.projects.moveCard({
-      card_id: card.id,
-      column_id: columnID,
-      position: "bottom"
-    });
+  const columnID = findColumnID(listColumn, columnName);
 
-    return true;
-  } else {
-    await context.github.issues.createComment(
-      context.issue({
-        body: `Not found issue ${context.payload.issue.url}, move fail`
-      })
-    );
-  }
+  await context.github.projects.moveCard({
+    card_id: issueProject.cardID,
+    column_id: columnID,
+    position: "bottom"
+  });
 
-  return false;
+  fileDB.saveIssueWithProject(context.payload.issue.id, {
+    ...issueProject,
+    column: columnID
+  });
+
+  return true;
 }
 
 function findColumnID(listColumn: any[], columnName: string): number {

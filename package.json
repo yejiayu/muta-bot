@@ -22,6 +22,8 @@
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
   },
   "dependencies": {
+    "@types/lowdb": "^1.0.9",
+    "lowdb": "^1.0.0",
     "probot": "^9.5.3",
     "titleize": "^2.1.0"
   },
