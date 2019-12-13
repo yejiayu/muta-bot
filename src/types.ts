@@ -16,4 +16,5 @@ export interface LatestWeekly {
   number: number;
   id: number;
   node_id: string;
+  last_number: number;
 }

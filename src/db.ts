@@ -18,7 +18,8 @@ class FileDB {
       latest_weekly_issue: {
         number: 0,
         id: 0,
-        node_id: ""
+        node_id: "",
+        last_number: 0
       }
     }).write();
 
@@ -57,12 +58,18 @@ class FileDB {
     return this.db.get(`issue_reviewers.${id}`).value();
   }
 
-  public saveLatestWeeklyIssue(id: number, number: number, node_id: string) {
+  public saveLatestWeeklyIssue(
+    id: number,
+    number: number,
+    node_id: string,
+    last_number: number
+  ) {
     this.db
       .set("latest_weekly_issue", {
         id,
         number,
-        node_id
+        node_id,
+        last_number
       })
       .write();
   }

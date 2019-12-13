@@ -138,7 +138,8 @@ export default function(app) {
     fileDB.saveLatestWeeklyIssue(
       issueRes.id,
       issueRes.number,
-      issueRes.node_id
+      issueRes.node_id,
+      latestWeekly.number
     );
 
     await context.github.issues.update({
@@ -366,7 +367,7 @@ async function getMDRender(context: Context): Promise<string> {
   const mdRender = `# Weekly Report\r\nCurrent milestones: [${
     milestone.title
   }](${milestone.url})\r\nLast report: ${
-    latestWeekly ? "#" + latestWeekly.number : "This is the first report."
+    latestWeekly ? "#" + latestWeekly.last_number : "This is the first report."
   }\r\n## In progress\r\n${taskToString(
     templateData.progress
   )}\r\n## In review\r\n${taskToString(
