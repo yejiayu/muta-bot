@@ -260,15 +260,11 @@ export = (app: Application) => {
       const params = {
         owner: context.payload.repository.owner.login,
         repo: context.payload.repository.name,
-        issue_number: context.payload.issue.number
+        issue_number: context.payload.issue.number,
+        milestone: null
       };
 
       await context.github.issues.removeLabels(context.issue());
-      await context.github.issues.deleteMilestone(
-        context.issue({
-          milestone_number: context.payload.issue.milestone.number
-        })
-      );
       await context.github.issues.removeAssignees(
         context.issue({
           assignees: context.payload.issue.assignees.map(a => a.login)
@@ -279,6 +275,8 @@ export = (app: Application) => {
         ...params,
         state: "closed"
       });
+
+      await removeCard(context);
     }
   });
 
@@ -340,7 +338,7 @@ function approve(context: Context): string[] {
 async function removeCard(context: Context) {
   const projectInfo = fileDB.getIssueWithProject(context.payload.issue.id);
 
-  context.github.projects.deleteCard({ card_id: projectInfo.cardID });
+  await context.github.projects.deleteCard({ card_id: projectInfo.cardID });
 }
 
 async function issueMoveColumn(
