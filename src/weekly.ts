@@ -13,6 +13,8 @@ const PROJECT_COLUMN_IN_PROGRESS = "In progress";
 const PROJECT_COLUMN_IN_REVIEW = "In review";
 const PROJECT_COLUMN_DONW = "Done";
 
+const REPO_NAME = process.env.REPO_NAME ? process.env.REPO_NAME : "muta-bot";
+
 // GraphQL query to pin an issue
 const pinissue = `mutation ($input: PinIssueInput!) {
   pinIssue(input: $input) {
@@ -57,9 +59,9 @@ export default function(app) {
   createScheduler(app);
   app.on("schedule.repository", async (context: Context) => {
     // this event is triggered on an interval, which is 1 hr by default
-    // if (context.payload.repository.name !== "muta-bot") {
-    //   return;
-    // }
+    if (context.payload.repository.name !== REPO_NAME) {
+      return;
+    }
 
     if (!isWeekend()) {
       return;
