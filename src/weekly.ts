@@ -216,6 +216,9 @@ async function getListIssueMeta(
 
     if (!issueMeta) {
       assignees = issue.assignees.map(user => user.login);
+    } else {
+      assignees = issueMeta.assignees;
+      reviewers = issueMeta.reviewers;
     }
 
     return {
