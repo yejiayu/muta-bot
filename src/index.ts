@@ -159,7 +159,7 @@ export = (app: Application) => {
         await context.github.issues.createComment(
           context.issue({
             body:
-              "Nice Boat! When you start a task, please comment /PATL call reviewers."
+              "Nice Boat! When you finish this task, please comment /PATL call reviewers."
           })
         );
 
