@@ -352,11 +352,9 @@ async function getMDRender(context: Context): Promise<string> {
     let startAt = moment(fileDB.getIssueStartAt(task.number));
 
     for (let i = 0; i < task.point; i++) {
-      const tempDate = startAt.add(1, "days");
-      if (tempDate.format("E") === "6" || tempDate.format("E") === "7") {
+      startAt = startAt.add(1, "days");
+      if (startAt.format("E") === "6" || startAt.format("E") === "7") {
         i--;
-      } else {
-        startAt = tempDate;
       }
     }
     const deadline = startAt;
