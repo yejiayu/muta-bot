@@ -2,6 +2,7 @@ import { Application, Context } from "probot"; // eslint-disable-line no-unused-
 import titleize from "titleize";
 
 import fileDB from "./db";
+import { moodyblues } from "./moodyblues";
 import weekly from "./weekly";
 
 const PROJECT_COLUMN_TODO = "To do";
@@ -24,6 +25,7 @@ interface IssueMeta {
 
 export = (app: Application) => {
   weekly(app);
+  moodyblues(app);
 
   app.on("issues.opened", async context => {
     const body = context.payload.issue.body;
@@ -159,7 +161,7 @@ export = (app: Application) => {
         await context.github.issues.createComment(
           context.issue({
             body:
-              "Nice Boat! When you finish this task, please comment /PATL call reviewers."
+              "Nice Boat! When you finish this task, please comment /PTAL(Please take a look) call reviewers."
           })
         );
 
@@ -288,10 +290,10 @@ export = (app: Application) => {
 };
 
 function parseIssueBody(body: string): IssueMeta {
-  let list = body.split("\r\n");
-  let newline_index = list.indexOf("");
+  const list = body.split("\r\n");
+  const newline_index = list.indexOf("");
 
-  let issue_meta = list.splice(0, newline_index);
+  const issue_meta = list.splice(0, newline_index);
 
   const meta: IssueMeta = {
     kind: "",
@@ -302,7 +304,7 @@ function parseIssueBody(body: string): IssueMeta {
   };
 
   issue_meta.forEach(item => {
-    let sub_items = item.trim().split(" ");
+    const sub_items = item.trim().split(" ");
     switch (sub_items[0].toLowerCase()) {
       case "/kind":
         meta.kind = sub_items[1];

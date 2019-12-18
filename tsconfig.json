@@ -13,7 +13,6 @@
     "sourceMap": true,
     "outDir": "./lib",
     "skipLibCheck": true,
-    "noImplicitAny": true,
     "esModuleInterop": true,
     "declaration": true,
     "resolveJsonModule": true,
