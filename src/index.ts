@@ -3,6 +3,7 @@ import titleize from "titleize";
 
 import fileDB from "./db";
 import weekly from "./weekly";
+import { pushHandler } from "./push";
 
 const PROJECT_COLUMN_TODO = "To do";
 const PROJECT_COLUMN_IN_PROGRESS = "In progress";
@@ -24,6 +25,9 @@ interface IssueMeta {
 
 export = (app: Application) => {
   weekly(app);
+  app.on("push", async context => {
+    pushHandler(context.payload);
+  });
 
   app.on("issues.opened", async context => {
     const body = context.payload.issue.body;
