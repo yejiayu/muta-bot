@@ -1,15 +1,16 @@
 import { exec } from "child_process";
 import queue from "async/queue";
-const yaml = require("js-yaml");
-const fs = require("fs");
-const _ = require("lodash");
-const { promisify } = require("util");
+import yaml from "js-yaml";
+import fs from "fs";
+import _ from "lodash";
+import { promisify } from "util";
+
 const execAsync = promisify(exec);
 
 let configs = [];
-const ci_config_path = process.env.CI_CONFIG;
+const ci_config_path = process.env.CI_CONFIG || "ci.yml";
 try {
-  configs = yaml.safeLoad(fs.readFileSync(ci_config_path));
+  configs = yaml.safeLoad(fs.readFileSync(ci_config_path, "utf8"));
 } catch (err) {
   console.log(
     JSON.stringify({ name: "parse_ci_config_failed", ci_config_path, err })
@@ -17,9 +18,8 @@ try {
 }
 
 const tasks_queue = Object();
-for (let i in configs) {
-  const name = configs[i]["name"];
-  tasks_queue[name] = queue(async function(task, callback) {
+for (let config of configs) {
+  tasks_queue[config["name"]] = queue(async function(task, callback) {
     try {
       const result = await execAsync(task.cmd);
       console.log(
