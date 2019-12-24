@@ -22,7 +22,7 @@
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
   },
   "dependencies": {
-    "@types/lowdb": "^1.0.9",
+    "async": "^3.1.0",
     "home": "^2.0.0",
     "js-yaml": "^3.13.1",
     "lowdb": "^1.0.0",
@@ -32,6 +32,10 @@
     "titleize": "^2.1.0"
   },
   "devDependencies": {
+    "@types/async": "^3.0.3",
+    "@types/js-yaml": "^3.12.1",
+    "@types/lodash": "^4.14.149",
+    "@types/lowdb": "^1.0.9",
     "@types/jest": "^24.0.19",
     "@types/nock": "^11.1.0",
     "@types/node": "^12.11.1",
@@ -43,6 +47,7 @@
     "smee-client": "^1.1.0",
     "standard": "^14.3.1",
     "ts-jest": "^24.1.0",
+    "ts-node": "^8.5.4",
     "typescript": "^3.6.4"
   },
   "engines": {
