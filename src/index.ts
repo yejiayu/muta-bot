@@ -34,97 +34,36 @@ export = (app: Application) => {
     if (!isTaskIssue(body)) {
       return;
     }
-    const issueMeta = parseIssueBody(body);
-    fileDB.saveIssuesMeta(context.payload.issue.id, issueMeta);
-    fileDB.saveIssueReviewers(context.payload.issue.id, issueMeta.reviewers);
 
-    const {
-      data: listMilestone
-    } = await context.github.issues.listMilestonesForRepo(context.issue());
+    const issueMeta = await updateIssue(context);
 
-    const milestone =
-      issueMeta.milestone.toLowerCase() === "latest"
-        ? listMilestone[listMilestone.length - 1]
-        : listMilestone.find(m => m.title === issueMeta.milestone);
-    if (!milestone) {
-      await context.github.issues.createComment(
-        context.issue({
-          body: `Not found milestone ${issueMeta.milestone}`
-        })
-      );
-      return;
-    }
-
-    const params = context.issue({
-      title: context.payload.issue.title
-        .toLowerCase()
-        .startsWith(`[${issueMeta.kind.toLowerCase()}]`)
-        ? titleize(context.payload.issue.title)
-        : `[${titleize(issueMeta.kind)}]` + context.payload.issue.title,
-      assignees: issueMeta.assignees.concat(issueMeta.reviewers),
-      labels: [
-        "k:" + issueMeta.kind,
-        "p" + issueMeta.point,
-        "bot:task",
-        "bot:todo"
-      ],
-      milestone: milestone.number
-    });
-
-    await context.github.issues.update(params);
-
-    if (await issueMoveColumn(context, milestone.title, PROJECT_COLUMN_TODO)) {
+    if (
+      await issueMoveColumn(context, issueMeta.milestone, PROJECT_COLUMN_TODO)
+    ) {
       await context.github.issues.createComment(
         context.issue({
           body:
-            "You have created a task, if you want to start it formally, please comment /Go"
+            "You have created a task, if you want to start it formally, please comment /Go\r\nEditing the task information is in effect until it is finished (comment /PTAL)."
         })
       );
     }
   });
 
-  // app.on("issues.edited", async context => {
-  //   const body = context.payload.issue.body;
-  //   if (!isTaskIssue(body)) {
-  //     return;
-  //   }
-  //   const issueMeta = parseIssueBody(body);
-  //
-  //   const {
-  //     data: listMilestone
-  //   } = await context.github.issues.listMilestonesForRepo(context.issue());
-  //
-  //   const milestone =
-  //     issueMeta.milestone.toLowerCase() === "latest"
-  //       ? listMilestone[listMilestone.length - 1]
-  //       : listMilestone.find(m => m.title === issueMeta.milestone);
-  //   if (!milestone) {
-  //     await context.github.issues.createComment(
-  //       context.issue({
-  //         body: `Not found milestone ${issueMeta.milestone}`
-  //       })
-  //     );
-  //     return;
-  //   }
-  //
-  //   const params = context.issue({
-  //     title: context.payload.issue.title
-  //       .toLowerCase()
-  //       .startsWith(`[${issueMeta.kind.toLowerCase()}]`)
-  //       ? titleize(context.payload.issue.title)
-  //       : `[${titleize(issueMeta.kind)}]` + context.payload.issue.title,
-  //     assignees: issueMeta.assignees.concat(issueMeta.reviewers),
-  //     labels: [
-  //       "k:" + issueMeta.kind,
-  //       "p" + issueMeta.point,
-  //       "bot:task",
-  //       "bot:todo"
-  //     ],
-  //     milestone: milestone.number
-  //   });
-  //
-  //   await context.github.issues.update(params);
-  // });
+  app.on("issues.edited", async context => {
+    const body = context.payload.issue.body;
+    if (!isTaskIssue(body)) {
+      return;
+    }
+
+    const unfinished = context.payload.issue.labels.find(l =>
+      [LABEL_TODO, LABEL_IN_PROGRESS].includes(l.name)
+    );
+    if (!unfinished) {
+      return;
+    }
+
+    await updateIssue(context);
+  });
 
   app.on("issue_comment", async context => {
     const body = context.payload.issue.body;
@@ -163,13 +102,14 @@ export = (app: Application) => {
         await context.github.issues.createComment(
           context.issue({
             body:
-              "Nice Boat! When you finish this task, please comment /PATL call reviewers."
+              "Nice Boat! When you finish this task, please comment /PTAL call reviewers."
           })
         );
 
         fileDB.saveIssueStartAt(context.payload.issue.id, Date.now());
       }
     } else if (comment.startsWith("/ptal")) {
+      console.log(isOwnerMessage(context));
       if (!isOwnerMessage(context)) {
         return;
       }
@@ -306,27 +246,41 @@ function parseIssueBody(body: string): IssueMeta {
   };
 
   issue_meta.forEach(item => {
-    let sub_items = item.trim().split(" ");
-    switch (sub_items[0].toLowerCase()) {
+    const trimItem = item.trim();
+    const spaceIndex = trimItem.indexOf(" ");
+
+    const key = trimItem.substring(0, spaceIndex).trim();
+    const value = trimItem.substring(spaceIndex + 1, trimItem.length).trim();
+
+    switch (key.toLowerCase()) {
       case "/kind":
-        meta.kind = sub_items[1];
+        meta.kind = value;
         break;
       case "/point":
-        meta.point = Number.parseInt(sub_items[1]);
+        meta.point = Number.parseInt(value);
         break;
       case "/assignees":
-        meta.assignees = sub_items.slice(1).map(user => user.slice(1));
+        meta.assignees = parseRawUser(value);
         break;
       case "/reviewers":
-        meta.reviewers = sub_items.slice(1).map(user => user.slice(1));
+        meta.reviewers = parseRawUser(value);
         break;
       case "/milestone":
-        meta.milestone = sub_items[1];
+        meta.milestone = value;
         break;
     }
   });
 
   return meta;
+}
+
+function parseRawUser(userStr: string): string[] {
+  const users = userStr
+    .split(" ")
+    .map(user => user.trim().slice(1)) // remove @
+    .filter(user => user !== "");
+
+  return Array.from(new Set(users));
 }
 
 function approve(context: Context): string[] {
@@ -343,6 +297,67 @@ async function removeCard(context: Context) {
   const projectInfo = fileDB.getIssueWithProject(context.payload.issue.id);
 
   await context.github.projects.deleteCard({ card_id: projectInfo.cardID });
+}
+
+async function updateIssue(context: Context): Promise<IssueMeta> {
+  const body = context.payload.issue.body;
+
+  const issueMeta = parseIssueBody(body);
+
+  const {
+    data: listMilestone
+  } = await context.github.issues.listMilestonesForRepo(context.issue());
+
+  const milestone =
+    issueMeta.milestone.toLowerCase() === "latest"
+      ? listMilestone[listMilestone.length - 1]
+      : listMilestone.find(m => m.title === issueMeta.milestone);
+  if (!milestone) {
+    await context.github.issues.createComment(
+      context.issue({
+        body: `Not found milestone ${issueMeta.milestone}`
+      })
+    );
+
+    throw new Error(`Not found milestone ${issueMeta.milestone}`);
+  }
+
+  issueMeta.milestone = milestone.title;
+  const oldIssueMeta = fileDB.getIssuesMeta(context.payload.issue.id);
+  if (oldIssueMeta) {
+    if (JSON.stringify(oldIssueMeta) === JSON.stringify(issueMeta)) {
+      return issueMeta;
+    }
+  }
+
+  fileDB.saveIssuesMeta(context.payload.issue.id, issueMeta);
+  fileDB.saveIssueReviewers(context.payload.issue.id, issueMeta.reviewers);
+
+  const title = context.payload.issue.title;
+
+  const projectLabel = context.payload.issue.labels.find(l =>
+    [LABEL_TODO, LABEL_IN_PROGRESS, LABEL_IN_REVIEW, LABEL_DONE].includes(
+      l.name
+    )
+  );
+
+  const params = context.issue({
+    title: /\[(.+)\]/g.test(title)
+      ? title.replace(/\[(.+)\]/g, `[${titleize(issueMeta.kind)}]`)
+      : `[${titleize(issueMeta.kind)}] ${title}`,
+    assignees: issueMeta.assignees.concat(issueMeta.reviewers),
+    labels: [
+      "k:" + issueMeta.kind,
+      "p" + issueMeta.point,
+      "bot:task",
+      projectLabel ? projectLabel.name : "bot:todo"
+    ],
+    milestone: milestone.number
+  });
+
+  await context.github.issues.update(params);
+
+  return issueMeta;
 }
 
 async function issueMoveColumn(
