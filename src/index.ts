@@ -26,7 +26,7 @@ interface IssueMeta {
 export = (app: Application) => {
   weekly(app);
   app.on("push", async context => {
-    pushHandler(context.payload);
+    await pushHandler(context.payload);
   });
 
   app.on("issues.opened", async context => {
