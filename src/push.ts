@@ -1,56 +1,34 @@
-import { exec } from "child_process";
+import * as path from "path";
 import queue from "async/queue";
-import yaml from "js-yaml";
-import fs from "fs";
-import _ from "lodash";
-import { promisify } from "util";
+import * as shell from "shelljs";
 
-const execAsync = promisify(exec);
+import config from "./config";
 
-let configs = [];
-const ci_config_path = process.env.CI_CONFIG || "ci.yml";
-try {
-  configs = yaml.safeLoad(fs.readFileSync(ci_config_path, "utf8"));
-} catch (err) {
-  console.log(
-    JSON.stringify({ name: "parse_ci_config_failed", ci_config_path, err })
-  );
-}
+const mutaPath = path.join(__dirname, "../muta");
 
-const tasks_queue = Object();
-for (let config of configs) {
-  tasks_queue[config["name"]] = queue(async function(task, callback) {
-    try {
-      const result = await execAsync(task.cmd);
-      console.log(
-        JSON.stringify({ name: "run_ci_task_success", task, result })
-      );
-    } catch (err) {
-      console.log(JSON.stringify({ name: "run_ci_task_failed", task, err }));
-    }
-    callback();
-  }, 1);
-}
-
-function checkAndRun(payload, config) {
-  // check filters
-  const match_filters = Object.entries(config.filters)
-    .map(filter => _.get(payload, filter[0]) === filter[1])
-    .every(item => item === true);
-  if (!match_filters) {
+const pushQueue = queue(async function(payload, callback) {
+  if (
+    payload.repository.full_name !== config.code_repo &&
+    payload.ref !== "refs/heads/" + config.code_branch
+  ) {
     return;
   }
-  // run cmd
-  // WARN: Use template literal in js to format cmd is powful but dangerous.
-  //       Be carefule when you use it.
-  const escaped_cmd = _.replace(config.cmd, new RegExp("`", "g"), "\\`");
-  const cmd = eval("`" + escaped_cmd + "`");
-  console.log(JSON.stringify({ name: "put_cmd_to_queue", cmd }));
-  tasks_queue[config["name"]].push({ cmd, name: config.name });
-}
 
-export function pushHandler(payload) {
-  configs.map(config => {
-    checkAndRun(payload, config);
+  const child = shell.exec(
+    `cd ${mutaPath} && git pull origin ${config.code_branch} && make docker-build && make docker-push`,
+    { async: true }
+  );
+  child.stdout.on("data", function(data) {
+    console.log(data);
   });
+
+  child.stderr.on("data", function(data) {
+    console.error(data);
+  });
+
+  callback();
+}, 1);
+
+export async function pushHandler(payload) {
+  pushQueue.push(payload);
 }
