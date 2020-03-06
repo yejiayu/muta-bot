@@ -53,7 +53,6 @@ async function getNodeData(name) {
       return 'http://' + config.KUBE_HOST + ':' + apiPort + '/graphql';
     }
   }()
-  console.log(dst);
   var sdk = new mutasdk.Muta({
     endpoint: dst,
     chainId: 'b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036',
@@ -64,7 +63,9 @@ async function getNodeData(name) {
   };
   try {
     ret.height = await sdk.getLatestBlockHeight();
+    console.log(dst, ret.height);
   } catch (err) {
+    console.log(dst, err);
   }
   return ret;
 }
