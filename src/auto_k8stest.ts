@@ -144,6 +144,7 @@ async function runOnK8s(
   await context.github.issues.createComment(
     context.issue({ body: `Docker builded. "mutadev/muta:${commitID}"\nRun chaos test on k8s named "${kubeName}"\nTest lasts 4 hours` })
   );
+  await sleep(60 * 1000);
 
   for (var i = 0; i < cSteps; i++) {
     var line = new Array();
