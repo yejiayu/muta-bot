@@ -110,7 +110,7 @@ async function runOnK8s(
   withChdir(cData, function () {
     shell.exec(`git clone -b ${remoteBranch} ${remoteRepoAddress} ${destName}`)
     withChdir(destName, function () {
-      if (!commitID) {
+      if (commitID !== undefined) {
         shell.exec(`git checkout ${commitID}`)
       } else {
         commitID = shell.exec('git rev-parse --short HEAD').stdout.trim();
