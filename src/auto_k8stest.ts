@@ -186,7 +186,7 @@ async function runOnK8s(
 
 export async function pullRequestHandler(context: probot.Context) {
   const payload = context.payload;
-  if (payload.pull_request.head.repo.full_name !== config.CODE_REPO) {
+  if (payload.pull_request.base.repo.full_name !== config.CODE_REPO) {
     console.log('Ignore, repo is', payload.pull_request.head.repo.full_name)
     return
   }
