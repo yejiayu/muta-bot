@@ -130,6 +130,7 @@ async function runOnK8s(
   txt = txt.replace('muta-example', kubeName);
   fs.writeFileSync(`${config.ROOT_K8SYAML_PATH}/kube_${commitID}.yaml`, txt);
   shell.exec(`kubectl delete -n mutadev muta.nervos.org ${kubeName}`);
+  await sleep(60 * 1000);
   shell.exec(`kubectl apply -f ${config.ROOT_K8SYAML_PATH}/kube_${commitID}.yaml`);
   setTimeout(function () {
     shell.exec(`kubectl delete -f ${config.ROOT_K8SYAML_PATH}/kube_${commitID}.yaml`);
