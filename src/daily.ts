@@ -6,10 +6,22 @@ import fileDB from "./db";
 import {
     WEEKLY_PROJECT_COLUMN_TODO,
     PROJECT_COLUMN_IN_PROGRESS, PROJECT_COLUMN_IN_REVIEW, PROJECT_COLUMN_DONW,
-    ListCard, TemplateData, listCardForProject, getListIssueMeta
+    ListCard, listCardForProject, getListIssueMeta, IssueMeta
 } from './weekly'
 
+import sendToTelegram from './notification'
+import {LatestWeekly} from "./types";
+
 const LABEL_DELAY = "bot:delay";
+const LABEL_DAILY_REPORT = "bot:delay";
+
+export interface AllTasks {
+    progress: IssueMeta[];
+    review: IssueMeta[];
+    done: IssueMeta[];
+    delay: IssueMeta[];
+    daily: IssueMeta[];
+}
 
 export default function (app) {
     createScheduler(app, {
@@ -19,11 +31,21 @@ export default function (app) {
     app.on("schedule.repository", async (context: Context) => {
         // this event is triggered on an interval, which is 1 hr by default
 
-        await handleDelayTasks(context)
+        let allTasks: AllTasks = {
+            progress: [],
+            review: [],
+            done: [],
+            delay: [],
+            daily: [],
+        }
+
+        await handleDelayTasks(context, allTasks)
+
+        await dailyReport(context, allTasks)
     })
 }
 
-async function handleDelayTasks(context: Context) {
+async function handleDelayTasks(context: Context, allTasks: AllTasks) {
     console.log('handleDelayTasks')
 
     const {data: projects} = await context.github.projects.listForRepo(
@@ -41,22 +63,16 @@ async function handleDelayTasks(context: Context) {
 
         const listCards = await listCardForProject(context, id);
 
-        await addDelayInTasks(context, listCards)
+        await addDelayLabelForTasks(context, listCards, allTasks)
     }
 
 }
 
-async function addDelayInTasks(context: Context, listCards: ListCard[]) {
+async function addDelayLabelForTasks(context: Context, listCards: ListCard[], allTasks: AllTasks) {
     console.log('handleCardsDelay')
 
     const localTimestamp = moment().unix()
 
-    const templateData: TemplateData = {
-        progress: [],
-        review: [],
-        done: [],
-        delay: []
-    }
 
     for (const cards of listCards) {
         switch (cards.cardType) {
@@ -65,12 +81,12 @@ async function addDelayInTasks(context: Context, listCards: ListCard[]) {
                     context,
                     cards.list
                 );
-                templateData.progress = listProgressIssueMeta;
+                allTasks.progress = listProgressIssueMeta;
                 break;
 
             case PROJECT_COLUMN_IN_REVIEW:
                 const listReviewIssueMeta = await getListIssueMeta(context, cards.list);
-                templateData.review = listReviewIssueMeta;
+                allTasks.review = listReviewIssueMeta;
                 break;
         }
     }
@@ -79,7 +95,7 @@ async function addDelayInTasks(context: Context, listCards: ListCard[]) {
     console.log("localTime:" + moment())
 
     // notify reviewers for in-review task
-    for (const task of templateData.review) {
+    for (const task of allTasks.review) {
         const assigneeString = task.assignees
             .map(s => {
                 return `@${s}`;
@@ -103,7 +119,7 @@ async function addDelayInTasks(context: Context, listCards: ListCard[]) {
     }
 
     // add delay label for delay tasks
-    const notReadyTask = templateData.progress.concat(templateData.review);
+    const notReadyTask = allTasks.progress.concat(allTasks.review);
     const delayTasks = notReadyTask.filter(task => {
         let startAt = moment(fileDB.getIssueStartAt(task.id));
 
@@ -139,4 +155,70 @@ async function addDelayInTasks(context: Context, listCards: ListCard[]) {
         );
     }
 
+}
+
+async function dailyReport(context: Context, allTasks: AllTasks) {
+    console.log('dailyReport')
+
+    const latestDailyIssue = fileDB.getLatestDailyIssue()
+    let daily_issue_number = -1
+
+    if (!validIssue(latestDailyIssue)) {
+        const yesterday = moment().add(-1, 'days')
+        const title = `[Daily-Report] ${yesterday.format("YYY-MM-DD")}`
+        daily_issue_number = findTask(title, allTasks)
+
+        // TODO create daily issue
+        // const {data: issueRes} = await context.github.issues.create(
+        //     context.issue({
+        //         body: '',
+        //         labels: ["k:daily-report"],
+        //         title: ''
+        //     })
+        // );
+    }
+    //
+    // const {data: issue} = await context.github.issues.get(
+    //     context.issue({
+    //         issue_number: daily_issue_number
+    //     })
+    // );
+
+    console.log('daily report issue: ')
+
+    // daily report update
+    // const body = await getDailyReportText(context)
+    //
+    // await context.github.issues.update({
+    //     issue_number: latestDailyIssue.number,
+    //     body: body,
+    //     owner: context.payload.repository.owner.login,
+    //     repo: context.payload.repository.name
+    // })
+
+    // notification to telegram channel
+    const text = `Daily Report: issue_number #`
+    sendToTelegram(text)
+}
+
+function validIssue(latestDailyIssue: LatestWeekly) {
+    // TODO check null, check issue date
+
+    const yesterday = moment().add(-1, 'days')
+    const title = `[Daily-Report] ${yesterday.format("YYY-MM-DD")}`
+
+    return false;
+}
+
+async function getDailyReportText(context: Context): Promise<string> {
+    return "test daily report"
+}
+
+function findTask(title: string, allTasks: AllTasks): number {
+    for (const task of allTasks.daily) {
+        if (task.title == title) {
+            return task.number
+        }
+    }
+    return -1
 }
