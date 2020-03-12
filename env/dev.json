@@ -1,5 +1,7 @@
 {
   "weekly_repo": "muta-bot",
   "code_repo": "yejiayu/muta-bot",
-  "code_branch": "master"
+  "code_branch": "master",
+  "telegram_bot_key": "1100798747:AAGj6GGV50Y_aqtZDGMh-aW_WQecyFJycAE",
+  "telegram_channel_id": -1001445330146
 }
