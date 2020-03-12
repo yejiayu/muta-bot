@@ -8,3 +8,5 @@ coverage
 lib
 db.json
 muta
+.idea
+test.js

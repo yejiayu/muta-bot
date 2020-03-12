@@ -281,7 +281,7 @@ function taskToString(tasks: IssueMeta[]): string {
 }
 
 async function moveToWeeklyProject(context: Context, id: number) {
-    const projectID = await getWeklyProject(context);
+    const projectID = await getWeeklyProject(context);
     const {data: listColumn} = await context.github.projects.listColumns({
         project_id: projectID
     });
@@ -294,7 +294,7 @@ async function moveToWeeklyProject(context: Context, id: number) {
     });
 }
 
-async function getWeklyProject(context: Context): Promise<number> {
+async function getWeeklyProject(context: Context): Promise<number> {
     const {data: projects} = await context.github.projects.listForRepo(
         context.issue()
     );
