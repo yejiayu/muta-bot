@@ -199,7 +199,7 @@ export async function listCardForProject(
     return Promise.all(promiseAll);
 }
 
-function findColumnID(listColumn: any[], columnName: string): number {
+export function findColumnID(listColumn: any[], columnName: string): number {
     const column = listColumn.find(column => column.name === columnName);
     return column.id;
 }

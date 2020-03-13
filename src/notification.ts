@@ -1,4 +1,4 @@
-import config from './config'
+import config from '../telegram.json'
 import {TelegramClient} from 'messaging-api-telegram'
 
 export default function (text) {
@@ -11,6 +11,7 @@ export default function (text) {
         chat_id,
         text,
         {
+            parse_mode: 'Markdown',
             disable_web_page_preview: true,
             disable_notification: false,
         }

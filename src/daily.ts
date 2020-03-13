@@ -6,14 +6,18 @@ import fileDB from "./db";
 import {
     WEEKLY_PROJECT_COLUMN_TODO,
     PROJECT_COLUMN_IN_PROGRESS, PROJECT_COLUMN_IN_REVIEW, PROJECT_COLUMN_DONW,
-    ListCard, listCardForProject, getListIssueMeta, IssueMeta
+    ListCard, listCardForProject, getListIssueMeta, IssueMeta, findColumnID
 } from './weekly'
 
 import sendToTelegram from './notification'
-import {LatestWeekly} from "./types";
 
 const LABEL_DELAY = "bot:delay";
 const LABEL_DAILY_REPORT = "bot:delay";
+
+
+const DAILY_PROJECT = "Daily-reports";
+const DAILY_PROJECT_COLUMN = "Daily report"
+
 
 export interface AllTasks {
     progress: IssueMeta[];
@@ -31,6 +35,8 @@ export default function (app) {
     app.on("schedule.repository", async (context: Context) => {
         // this event is triggered on an interval, which is 1 hr by default
 
+        //ToDo check time valid
+
         let allTasks: AllTasks = {
             progress: [],
             review: [],
@@ -42,6 +48,8 @@ export default function (app) {
         await handleDelayTasks(context, allTasks)
 
         await dailyReport(context, allTasks)
+
+        await createNextDailyIssue(context, allTasks)
     })
 }
 
@@ -163,62 +171,103 @@ async function dailyReport(context: Context, allTasks: AllTasks) {
     const latestDailyIssue = fileDB.getLatestDailyIssue()
     let daily_issue_number = -1
 
-    if (!validIssue(latestDailyIssue)) {
-        const yesterday = moment().add(-1, 'days')
-        const title = `[Daily-Report] ${yesterday.format("YYY-MM-DD")}`
-        daily_issue_number = findTask(title, allTasks)
-
-        // TODO create daily issue
-        // const {data: issueRes} = await context.github.issues.create(
-        //     context.issue({
-        //         body: '',
-        //         labels: ["k:daily-report"],
-        //         title: ''
-        //     })
-        // );
-    }
-    //
-    // const {data: issue} = await context.github.issues.get(
-    //     context.issue({
-    //         issue_number: daily_issue_number
-    //     })
-    // );
-
-    console.log('daily report issue: ')
-
-    // daily report update
-    // const body = await getDailyReportText(context)
-    //
-    // await context.github.issues.update({
-    //     issue_number: latestDailyIssue.number,
-    //     body: body,
-    //     owner: context.payload.repository.owner.login,
-    //     repo: context.payload.repository.name
-    // })
-
-    // notification to telegram channel
-    const text = `Daily Report: issue_number #`
-    sendToTelegram(text)
-}
-
-function validIssue(latestDailyIssue: LatestWeekly) {
-    // TODO check null, check issue date
-
     const yesterday = moment().add(-1, 'days')
     const title = `[Daily-Report] ${yesterday.format("YYY-MM-DD")}`
 
-    return false;
+    if (!latestDailyIssue) {
+        daily_issue_number = findDailyTask(title, allTasks)
+    }
+
+    if (daily_issue_number < 0) {
+        throw new Error(`Not found daily report issue ${title}`);
+    }
+
+    const {data: issue} = await context.github.issues.get(
+        context.issue({
+            issue_number: daily_issue_number
+        })
+    );
+
+    if (issue.title != title) {
+        throw new Error(`Not found daily report issue ${title}`);
+    }
+
+    console.log('get daily report issue: ' , issue.title, issue.number, issue.labels)
+    const body = await getDailyReportText(context)
+
+    await context.github.issues.update({
+        issue_number: latestDailyIssue.number,
+        body: body,
+        owner: context.payload.repository.owner.login,
+        repo: context.payload.repository.name
+    })
+
+    // notification to telegram channel
+    const text = `${title}\r\n${issue.url}`
+    sendToTelegram(text)
 }
+
 
 async function getDailyReportText(context: Context): Promise<string> {
     return "test daily report"
 }
 
-function findTask(title: string, allTasks: AllTasks): number {
+function findDailyTask(title: string, allTasks: AllTasks): number {
     for (const task of allTasks.daily) {
         if (task.title == title) {
             return task.number
         }
     }
     return -1
+}
+
+async function createNextDailyIssue(context: Context, allTasks: AllTasks) {
+    const today = moment()
+    const title = `[Daily-Report] ${today.format("YYY-MM-DD")}`
+    const issuer_number = findDailyTask(title, allTasks)
+    if (issuer_number > -1) {
+
+    }
+
+    const {data: issueRes} = await context.github.issues.create(
+        context.issue({
+            body: `**Done**:\r\n**Todo**:\r\n**Problem**:`,
+            labels: [LABEL_DAILY_REPORT],
+            title: title
+        })
+    );
+
+    await moveToDailyProject(context, issueRes.id)
+    fileDB.saveLatestDailyIssue(
+        issueRes.id,
+        issueRes.number,
+        issueRes.node_id,
+        -1,
+    )
+}
+
+async function getDailyProject(context: Context) {
+    const {data: projects} = await context.github.projects.listForRepo(
+        context.issue()
+    );
+
+    const dailyProject = projects.find(p => p.name === DAILY_PROJECT);
+    if (!dailyProject) {
+        throw new Error(`Not found ${DAILY_PROJECT}`);
+    }
+    return dailyProject.id;
+}
+
+async function moveToDailyProject(context: Context, id: number) {
+    const projectID = await getDailyProject(context);
+    const {data: listColumn} = await context.github.projects.listColumns({
+        project_id: projectID
+    });
+
+    const columnID = findColumnID(listColumn, DAILY_PROJECT_COLUMN);
+    await context.github.projects.createCard({
+        column_id: columnID,
+        content_id: id,
+        content_type: "Issue"
+    });
 }
