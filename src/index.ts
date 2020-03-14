@@ -26,18 +26,14 @@ interface IssueMeta {
 }
 
 export = (app: Application) => {
-    console.log('solve issue_number2222')
     daily(app);
     weekly(app);
     app.on("push", async context => {
-        console.log('push ok')
         await pushHandler(context.payload);
     });
 
     app.on("issues.opened", async context => {
         const body = context.payload.issue.body;
-        console.log('issues open')
-
         if (!isTaskIssue(body)) {
             return;
         }
@@ -74,8 +70,6 @@ export = (app: Application) => {
 
     app.on("issue_comment", async context => {
         const body = context.payload.issue.body;
-        console.log('issue_comment' + body)
-
         if (!isTaskIssue(body)) {
             return;
         }
