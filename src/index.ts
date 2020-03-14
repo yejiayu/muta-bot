@@ -25,6 +25,7 @@ interface IssueMeta {
 }
 
 export = (app: Application) => {
+    console.log('solve issue_number2222')
     daily(app);
     weekly(app);
     app.on("push", async context => {

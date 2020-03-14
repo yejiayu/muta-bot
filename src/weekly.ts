@@ -12,7 +12,7 @@ export const WEEKLY_PROJECT_COLUMN_TODO = "To do";
 
 export const PROJECT_COLUMN_IN_PROGRESS = "In progress";
 export const PROJECT_COLUMN_IN_REVIEW = "In review";
-export const PROJECT_COLUMN_DONW = "Done";
+export const PROJECT_COLUMN_DONE = "Done";
 
 const REPO_NAME = config.weekly_repo;
 
@@ -182,7 +182,7 @@ export async function listCardForProject(
     const promiseAll = [
         PROJECT_COLUMN_IN_PROGRESS,
         PROJECT_COLUMN_IN_REVIEW,
-        PROJECT_COLUMN_DONW
+        PROJECT_COLUMN_DONE,
     ]
         .map(name => {
             return {column_id: findColumnID(listColumn, name), name};
@@ -242,8 +242,8 @@ async function getIssue(
     context: Context,
     contentURL: string
 ): Promise<Octokit.IssuesGetResponse> {
-    const id = getIssueID(contentURL);
-    const issue = await context.github.issues.get(context.issue({number: id}));
+    const issue_number = getIssueID(contentURL);
+    const issue = await context.github.issues.get(context.issue({issue_number}));
     return issue.data;
 }
 
@@ -339,7 +339,7 @@ async function getMDRender(context: Context): Promise<string> {
                 const listReviewIssueMeta = await getListIssueMeta(context, cards.list);
                 templateData.review = listReviewIssueMeta;
                 break;
-            case PROJECT_COLUMN_DONW:
+            case PROJECT_COLUMN_DONE:
                 const listDoneIssueMeta = await getListIssueMeta(
                     context,
                     cards.list.filter(card => isWeekIssue(card.updated_at, sunday))
