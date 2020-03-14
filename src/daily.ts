@@ -3,6 +3,8 @@ import createScheduler from "probot-scheduler";
 import moment from "moment";
 import fileDB from "./db";
 
+const tg = require(`../tg`);
+
 import {
     WEEKLY_PROJECT_COLUMN_TODO,
     PROJECT_COLUMN_IN_PROGRESS, PROJECT_COLUMN_IN_REVIEW, PROJECT_COLUMN_DONE,
@@ -28,7 +30,7 @@ export interface AllTasks {
 
 export default function (app) {
     createScheduler(app, {
-        interval: 60 * 1000 // 20s
+        interval: 10 * 1000 // 20s
     })
 
     app.on("schedule.repository", async (context: Context) => {
@@ -203,6 +205,7 @@ async function dailyReport(context: Context, allTasks: AllTasks) {
     if (daily_issue_number < 0) {
         throw new Error(`Not found daily report issue ${title}`);
     }
+
     const {data: issue} = await context.github.issues.get(
         context.issue({
             issue_number: daily_issue_number
@@ -216,6 +219,8 @@ async function dailyReport(context: Context, allTasks: AllTasks) {
     }
 
     console.log('--daily report issue: ', issue.title, issue.number, issue.labels)
+
+    // yesterday daily report issue update
     const body = await getDailyReportText(context)
     await context.github.issues.update({
         issue_number: daily_issue_number,
@@ -225,7 +230,11 @@ async function dailyReport(context: Context, allTasks: AllTasks) {
     })
 
     // notification to telegram channel
-    const text = `${title}\r\n${issue.html_url}`
+    // 1.yesterday report issue url remind
+    // 2.members who have not yet updated daily report issue
+    const membersRemind = await getMembersRemind(context, issue)
+    const text = `*${title}* Waiting for updates\r\n${issue.html_url}\r\n`
+        + `${membersRemind}`
     sendToTelegram(text)
 }
 
@@ -291,4 +300,24 @@ async function moveToDailyProject(context: Context, id: number) {
         content_id: id,
         content_type: "Issue"
     });
+}
+
+async function getMembersRemind(context: Context, daily_issue: Octokit.IssuesGetResponse): Promise<string> {
+    const {data: listComments} = await context.github.issues.listComments(
+        context.issue({
+            issue_number: daily_issue.number
+        })
+    )
+
+    let hashCommented: { [index: string]: boolean } = {}
+
+    for (const comment of listComments) {
+        hashCommented[comment.user.login] = true
+    }
+
+    return tg['members'].filter(item => {
+        return !hashCommented[item['github']]
+    })
+        .map(s => `- @${s['telegram'] ? s['telegram'] : s['github']}`)
+        .join('\r\n')
 }
