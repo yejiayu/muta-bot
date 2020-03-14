@@ -5,6 +5,7 @@ import fileDB from "./db";
 import daily from "./daily";
 import weekly from "./weekly";
 import {pushHandler} from "./push";
+import moment = require("moment");
 
 const PROJECT_COLUMN_TODO = "To do";
 const PROJECT_COLUMN_IN_PROGRESS = "In progress";
@@ -94,6 +95,13 @@ export = (app: Application) => {
                 return;
             }
 
+            const startAt = moment()
+            const points = getPoints(context.payload.issue.body)
+            const deadline = getDeadline(startAt, points)
+            const body = `${context.payload.issue.body}\r\n\r\n## Bot updates\r\n` +
+                `**StartAt**    ${startAt.format("YYYY-MM-DD,  dddd")}\r\n` +
+                `**Deadline**  ${deadline.format("YYYY-MM-DD,  dddd")}`;
+
             labels.push(LABEL_IN_PROGRESS);
             if (
                 await issueMoveColumn(
@@ -104,6 +112,7 @@ export = (app: Application) => {
             ) {
                 await context.github.issues.update(
                     context.issue({
+                        body,
                         labels: labels.filter(s => s !== LABEL_TODO)
                     })
                 );
@@ -453,4 +462,21 @@ function isLabelByName(source: string[], target: string[]): boolean {
         return true;
     }
     return false;
+}
+
+function getPoints(body: string): number {
+    const issueMeta = parseIssueBody(body);
+    return issueMeta.point
+}
+
+function getDeadline(startAt: moment.Moment, point: number): moment.Moment {
+    let deadline = startAt.clone()
+    for (let i = 0; i < point; i++) {
+        deadline = deadline.add(1, "days");
+        if (deadline.format("E") === "6" || deadline.format("E") === "7") {
+            i--;
+        }
+    }
+
+    return deadline
 }

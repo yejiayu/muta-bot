@@ -82,7 +82,6 @@ async function getAllTasks(context: Context, allTasks: AllTasks) {
     }
 }
 
-
 async function listCardsToAllTasks(context: Context, listCards: ListCard[], allTasks: AllTasks, isDailyProject: boolean) {
     console.log('--listCardsToAllTasks')
 
