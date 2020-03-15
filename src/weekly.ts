@@ -14,7 +14,7 @@ export const PROJECT_COLUMN_IN_PROGRESS = "In progress";
 export const PROJECT_COLUMN_IN_REVIEW = "In review";
 export const PROJECT_COLUMN_DONE = "Done";
 
-const REPO_NAME = config.weekly_repo;
+export const REPO_NAME = config.weekly_repo;
 
 // GraphQL query to pin an issue
 const pinissue = `mutation ($input: PinIssueInput!) {

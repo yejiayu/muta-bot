@@ -9,7 +9,7 @@ const tg = require(`../tg`);
 import {
     WEEKLY_PROJECT_COLUMN_TODO,
     PROJECT_COLUMN_IN_PROGRESS, PROJECT_COLUMN_IN_REVIEW, PROJECT_COLUMN_DONE,
-    ListCard, listCardForProject, getListIssueMeta, IssueMeta, findColumnID
+    ListCard, listCardForProject, getListIssueMeta, IssueMeta, findColumnID, REPO_NAME
 } from './weekly'
 
 import sendToTelegram from './notification'
@@ -38,7 +38,9 @@ export default function (app) {
     app.on("schedule.repository", async (context: Context) => {
         // this event is triggered on an interval, which is in by default
         // set interval = 10 minutes
-
+        if (context.payload.repository.name !== REPO_NAME) {
+            return;
+        }
         log('daily schedule')
         const timeStr = moment().format("HH:mm").substr(0, 4)
         const day = moment().format("E");
