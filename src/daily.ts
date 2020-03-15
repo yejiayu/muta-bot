@@ -14,7 +14,7 @@ import {
 
 import sendToTelegram from './notification'
 
-const LABEL_DELAY = "bot:delay";
+const LABEL_DELAY = "bot:delay";  // delay issue , not daily
 const LABEL_DAILY_REPORT = "k:daily-report";
 const DAILY_PROJECT = "Daily-reports";
 
@@ -63,7 +63,7 @@ export default function (app) {
                 await notifyReviewers(context, allTasks)
                 await addDelayLabelForTasks(context, allTasks)
                 await dailyReport(context, allTasks, true)
-                await createNextDailyIssue(context, allTasks)
+                await createTodayDailyIssue(context, allTasks)
                 break
 
             case '10:0' : // 10:00 ~ 10:09
@@ -75,12 +75,13 @@ export default function (app) {
                 await dailyReport(context, allTasks, true)
                 break
 
-            case '23:0' : // 23:00 ~ 23:09
+            case '22:0' : // 22:00 ~ 22:09
                 log(timeStr)
                 if (day == '6') {
                     return
                 }
                 await getAllTasks(context, allTasks)
+                await createTodayDailyIssue(context, allTasks)
                 await dailyReport(context, allTasks, false)
                 break
 
@@ -297,7 +298,7 @@ function findDailyTask(title: string, allTasks: AllTasks): number {
     return -1
 }
 
-async function createNextDailyIssue(context: Context, allTasks: AllTasks) {
+async function createTodayDailyIssue(context: Context, allTasks: AllTasks) {
     const today = moment()
     const title = `[Daily-Report] ${today.format("YYYY-MM-DD")}`
     const issuer_number = findDailyTask(title, allTasks)
